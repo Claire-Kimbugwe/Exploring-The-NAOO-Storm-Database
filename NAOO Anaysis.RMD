@@ -1,0 +1,187 @@
+
+
+---
+title: "Exploring the Impact of Severe Weather on the Health and Economy of USA, 
+CASE STUDY:NOAA Storm Database"
+author: "by Claire Muwanguzi"
+date: "October 5, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Over View
+
+### The basic goal of this project is to explore the NOAA Storm Database and answer some basic questions about the impact of severe weather events
+
+
+# Synopsis
+### Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+### This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+## Research Questions
+
+### 1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+### 2. Across the United States, which types of events have the greatest economic consequences?
+
+### This Analysis shows that:
+#### - Tonados are responsible for most of the fatalities.
+#### - Floods are responsible for most of the economic damages.
+
+## Data Loading:
+
+### The data was downloaded from the NOAA website and saved in a file on my local drive and then read into R using read.csv.A copy of the original dataset used is available on request.
+
+
+```{r cache=TRUE}
+NOAA <- read.csv("repdata%2Fdata%2FStormData.csv.bz2")
+
+#Looking at the structure of the dataset 
+str(NOAA)
+```
+
+
+
+
+
+# Data Processing:
+
+#### To be able to answer the research questions better and also use less time going through a big dataset, I decided to subset the data to create a table with only the below listed variables that are necesary to answer our questions.
+
+- EVTYPE
+- FATALITIES
+- INJURIES
+- PROPDMG
+- PROPDMGEXP
+- CROPDMG
+- CROPDMGEXP'
+
+
+```{r  }
+# Subset (NOAA) storm database
+NOAA2 <- NOAA[,c('EVTYPE','FATALITIES','INJURIES', 'PROPDMG', 'PROPDMGEXP', 'CROPDMG', 'CROPDMGEXP')]
+
+#Looking at the first 5 variables
+head(NOAA2)
+
+#Statistics of the table
+summary(NOAA2)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+#### To get the fatalities per event , I used the aggregate function to group the Fatalities by Event and then get the sum for each event. Since we are looking at the most hamful, I ordered the data by decreasing fatalities and only selected the highest 8. I created a dataset with only the top 8, and then used that to comeup with the ggplot.
+
+
+
+```{r}
+
+Fatality <-  aggregate(NOAA2$FATALITIES, by = list(NOAA2$EVTYPE), sum)
+names(Fatality) <- c("EvType", "Fatalities")  
+head(Fatality)
+OrderedFat <- Fatality[order(Fatality$Fatalities, decreasing = T),]
+TopFatal <-OrderedFat[1:8,]
+
+
+
+```
+
+
+
+#### To better answer the question on the economic impact , I had to calculate the property and crop damage, and record figures in numeric data, then I also  decided to create a new Variable called Total damage which is a summation of property damage and crop dammage. I then grouped the sum by the events. ordered by number of damages in descending order so i can get the Top most. I then created a subset of data with only the 8 events. The Top8 dataset is the data I used to come up with the graph.
+
+
+
+### Convert H, K, M, B units to calculate Property Damage 
+
+```{r}
+
+# Convert H, K, M, B units to calculate Property Damage 
+
+NOAA2$PROPDMGNUM = 0
+NOAA2[NOAA2$PROPDMGEXP == "H", ]$PROPDMGNUM = NOAA2[NOAA2$PROPDMGEXP == "H", ]$PROPDMG * 10^2
+NOAA2[NOAA2$PROPDMGEXP == "K", ]$PROPDMGNUM = NOAA2[NOAA2$PROPDMGEXP == "K", ]$PROPDMG * 10^3
+NOAA2[NOAA2$PROPDMGEXP == "M", ]$PROPDMGNUM = NOAA2[NOAA2$PROPDMGEXP == "M", ]$PROPDMG * 10^6
+NOAA2[NOAA2$PROPDMGEXP == "B", ]$PROPDMGNUM = NOAA2[NOAA2$PROPDMGEXP == "B", ]$PROPDMG * 10^9
+
+```
+
+
+
+
+### Calculate the Crop Damage
+
+```{r}
+ 
+
+NOAA2$CROPDMGNUM = 0
+NOAA2[NOAA2$CROPDMGEXP == "H", ]$CROPDMGNUM = NOAA2[NOAA2$CROPDMGEXP == "H", ]$CROPDMG * 10^2
+NOAA2[NOAA2$CROPDMGEXP == "K", ]$CROPDMGNUM = NOAA2[NOAA2$CROPDMGEXP == "K", ]$CROPDMG * 10^3
+NOAA2[NOAA2$CROPDMGEXP == "M", ]$CROPDMGNUM = NOAA2[NOAA2$CROPDMGEXP == "M", ]$CROPDMG * 10^6
+NOAA2[NOAA2$CROPDMGEXP == "B", ]$CROPDMGNUM = NOAA2[NOAA2$CROPDMGEXP == "B", ]$CROPDMG * 10^9
+```
+
+
+### Getting a Subset of the Top 8 events with the most economic impact. 
+
+
+```{r}
+damages <- aggregate(PROPDMGNUM + CROPDMGNUM ~ EVTYPE, data=NOAA2, sum)
+names(damages) = c("EVTYPE", "TOTALDAMAGE")
+damages <- damages[order(-damages$TOTALDAMAGE), ][1:10, ]
+damages$EVTYPE <- factor(damages$EVTYPE, levels = damages$EVTYPE)
+TopDamages <- damages[1:8,]
+```
+
+
+# RESULTS
+
+
+## Fatalities Per Event:
+
+
+```{r}
+#PLOT
+library(ggplot2)
+ggplot(TopFatal, aes( x= EvType, y=Fatalities))+ geom_bar(stat = "identity", fill= "green")+
+  ggtitle("Number of Fatalities by top 8 Weather events")+ xlab("Event Type")+
+  theme(axis.text.x = element_text(size = 12, angle = 90, colour = "1",hjust = 1), 
+        axis.title = element_text(size = 18, colour = "red"))
+```
+
+
+
+#### From the above graph we can see that Tornados caused the most fatalities
+
+
+# Events with Greatest Economic Responses
+
+```{r}
+damages <- aggregate(PROPDMGNUM + CROPDMGNUM ~ EVTYPE, data=NOAA2, sum)
+names(damages) = c("EVTYPE", "TOTALDAMAGE")
+damages <- damages[order(-damages$TOTALDAMAGE), ][1:10, ]
+damages$EVTYPE <- factor(damages$EVTYPE, levels = damages$EVTYPE)
+TopDamages <- damages[1:8,]
+
+ggplot(TopDamages, aes(x = EVTYPE, y = TOTALDAMAGE)) + 
+    geom_bar(stat = "identity", fill = "Pink") + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title = element_text(size = 18, colour = "red")) + 
+    xlab("Event Type") + ylab("Damages ($)") + ggtitle("Property & Crop Damages by top 10 Weather Events")
+```
+
+
+
+
+### From the above graph we can see that the FLoods caused the most financial damage 
+
+
+
+
+
+
